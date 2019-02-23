@@ -1,0 +1,5 @@
+name: DiscordIntegration
+author: Twasi Team
+version: 1.0
+main: net.twasidependency.discordbot.Plugin
+dependency: true
