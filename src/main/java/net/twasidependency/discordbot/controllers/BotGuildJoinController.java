@@ -1,5 +1,6 @@
-package net.twasidependency.discordbot.listeners;
+package net.twasidependency.discordbot.controllers;
 
+import net.dv8tion.jda.core.JDA;
 import net.dv8tion.jda.core.entities.Guild;
 import net.dv8tion.jda.core.entities.TextChannel;
 import net.dv8tion.jda.core.events.guild.GuildJoinEvent;
@@ -17,15 +18,29 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static net.twasidependency.discordbot.Plugin.config;
 import static net.twasidependency.discordbot.Plugin.log;
 
-public class GuildJoinListener extends ListenerAdapter {
+public class BotGuildJoinController extends ListenerAdapter {
+
     UserDiscordServerRepository repo = ServiceRegistry.get(DataService.class).get(UserDiscordServerRepository.class);
-    private static String serverNotRegisteredMessage = "This server is not registered to a Twasi user yet." +
+    private String serverNotRegisteredMessage = "This server is not registered to a Twasi user yet." +
             " Please connect your Discord account to Twasi in Twasi Panel and enter this id: '%s'.";
+
+    public BotGuildJoinController(JDA jda) {
+        log("looping through guilds");
+        for (Guild guild : jda.getGuilds()) {
+            log(guild.getId());
+            checkBotUsePermissionForGuild(guild);
+        }
+        jda.addEventListener(this);
+        log("controller started");
+    }
 
     @Override
     public void onGuildJoin(GuildJoinEvent event) {
-        log("Joining guild...");
-        Guild guild = event.getGuild();
+        checkBotUsePermissionForGuild(event.getGuild());
+        log("joining guild");
+    }
+
+    public void checkBotUsePermissionForGuild(Guild guild) {
         if (guild.getId().equals(config.getDefaultDiscordServerId())) { // Compare guild ID to configured default guild
             log("Guild is default guild.");
             return; // No need to leave guild
@@ -38,7 +53,7 @@ public class GuildJoinListener extends ListenerAdapter {
         log("Guild is verified user-guild."); // No need to leave guild
     }
 
-    public static void forceLeaveServerWithMessage(Guild guild) {
+    public void forceLeaveServerWithMessage(Guild guild) {
         AtomicInteger counter = new AtomicInteger(); // Counts the thread's sleep seconds (atomic because of shared access)
         AtomicBoolean leaved = new AtomicBoolean(false); // Knows whether the guild was successfully leaves or not (atomic because of shared access)
         List<TextChannel> channels = new ArrayList<>(); // A list of channels to try to send message in
@@ -65,7 +80,8 @@ public class GuildJoinListener extends ListenerAdapter {
         new Thread(() -> {
             try {
                 TimeUnit.SECONDS.sleep(counter.get()); // Get last value from counter and sleep that time (no need for another increment)
-                if (!leaved.get()) guild.leave().queue(); // If the guild hasn't been left until now (because no message could be sent) just leave it
+                if (!leaved.get())
+                    guild.leave().queue(); // If the guild hasn't been left until now (because no message could be sent) just leave it
             } catch (Exception ignored) { // Prevent unexpected exceptions
             }
         }).start();

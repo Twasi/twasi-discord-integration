@@ -7,18 +7,21 @@ import net.twasi.core.logger.TwasiLogger;
 import net.twasi.core.plugin.TwasiDependency;
 import net.twasi.core.services.ServiceRegistry;
 import net.twasi.core.services.providers.DataService;
+import net.twasidependency.discordbot.controllers.BotGuildJoinController;
 import net.twasidependency.discordbot.database.ConfigurationEntity;
 import net.twasidependency.discordbot.database.ConfigurationRepository;
-import net.twasidependency.discordbot.listeners.GuildJoinListener;
-import net.twasidependency.discordbot.listeners.GuildLeaveListener;
-import net.twasidependency.discordbot.listeners.MessageListener;
+import net.twasidependency.discordbot.service.DiscordService;
 
 import javax.security.auth.login.LoginException;
 
 public class Plugin extends TwasiDependency {
     public static String prefix = "[Discord] ";
     public static ConfigurationEntity config;
-    private JDA bot = null;
+    public static DiscordService service;
+    public static JDA bot = null;
+
+    // Controllers:
+    public static BotGuildJoinController guildJoinController;
 
     @Override
     public void onActivate() {
@@ -59,15 +62,28 @@ public class Plugin extends TwasiDependency {
             return;
         }
         try {
+            // Build jda and connect
             bot = new JDABuilder(entity.getToken()).build();
-            bot.addEventListener(new MessageListener());
-            bot.addEventListener(new GuildJoinListener());
-            bot.addEventListener(new GuildLeaveListener());
-            log("Let Twasibot join the Server that is set in configuration " + bot.asBot().getInviteUrl(Permission.ADMINISTRATOR));
-            ServiceRegistry.register(new DiscordService());
+
+            log("Waiting for bot to connect...");
+            bot.awaitReady();
+            log("Connected! c:");
+
+            // Instantiate controllers
+            guildJoinController = new BotGuildJoinController(bot);
+
+            // Instantiate and register service
+            service = new DiscordService();
+            ServiceRegistry.register(service);
+
+            // Inform user about bot join link
+            log("Let Twasibot join the Server that is set in configuration ==> %s <<==", bot.asBot().getInviteUrl(Permission.ADMINISTRATOR));
         } catch (LoginException e) {
             logWarn("Unable to login to Discord API. Please check if the provided token in configuration is valid.");
             logDebug("Used token: " + entity.getToken());
+        } catch (InterruptedException e) {
+            logWarn("Discord bot was interrupted on startup.");
+            logDebug(e.getLocalizedMessage());
         }
     }
 
@@ -78,6 +94,10 @@ public class Plugin extends TwasiDependency {
 
     public static void log(String log) {
         TwasiLogger.log.info(prefix + log);
+    }
+
+    public static void log(String log, Object... objects) {
+        log(String.format(log, objects));
     }
 
     public void logWarn(String log) {
