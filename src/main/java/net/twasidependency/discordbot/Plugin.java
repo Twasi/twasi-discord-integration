@@ -7,7 +7,10 @@ import net.twasi.core.logger.TwasiLogger;
 import net.twasi.core.plugin.TwasiDependency;
 import net.twasi.core.services.ServiceRegistry;
 import net.twasi.core.services.providers.DataService;
+import net.twasi.core.services.providers.config.ConfigService;
+import net.twasidependency.discordbot.commands.defaultcommands.HelpCommand;
 import net.twasidependency.discordbot.controllers.BotGuildJoinController;
+import net.twasidependency.discordbot.controllers.MessageProcessingController;
 import net.twasidependency.discordbot.database.ConfigurationEntity;
 import net.twasidependency.discordbot.database.ConfigurationRepository;
 import net.twasidependency.discordbot.service.DiscordService;
@@ -16,15 +19,18 @@ import javax.security.auth.login.LoginException;
 
 public class Plugin extends TwasiDependency {
     public static String prefix = "[Discord] ";
+    public static String botPrefix;
     public static ConfigurationEntity config;
     public static DiscordService service;
     public static JDA bot = null;
 
     // Controllers:
     public static BotGuildJoinController guildJoinController;
+    public static MessageProcessingController messageController;
 
     @Override
     public void onActivate() {
+        botPrefix = ServiceRegistry.get(ConfigService.class).getCatalog().bot.prefix;
         log("Discord Bot starting up...");
         log("Trying to load configuration...");
         ConfigurationRepository repo = ServiceRegistry.get(DataService.class).get(ConfigurationRepository.class);
@@ -71,10 +77,14 @@ public class Plugin extends TwasiDependency {
 
             // Instantiate controllers
             guildJoinController = new BotGuildJoinController(bot);
+            messageController = new MessageProcessingController(bot);
 
             // Instantiate and register service
             service = new DiscordService();
             ServiceRegistry.register(service);
+
+            // Register default commands
+            HelpCommand.register();
 
             // Inform user about bot join link
             log("Let Twasibot join the Server that is set in configuration ==> %s <<==", bot.asBot().getInviteUrl(Permission.ADMINISTRATOR));
